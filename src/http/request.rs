@@ -1,3 +1,13 @@
+use super::method::Method;
+use crate::http::ParseError::InvalidEncoding;
+use std::any::TypeId;
+use std::backtrace::Backtrace;
+use std::convert::TryFrom;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::str;
+use std::str::Utf8Error;
+
 pub struct Request {
     path: String,
     query_string: Option<String>,
@@ -5,9 +15,68 @@ pub struct Request {
 }
 
 impl TryFrom<&[u8]> for Request {
-    type Error = String;
+    type Error = ParseError;
 
     fn try_from(buf: &[u8]) -> Result<Self, Self::Error> {
-        todo!()
+        //let req = str::from_utf8(buf).or(Err(ParseError::InvalidEncoding))?;
+        let req = str::from_utf8(buf)?;
+
+        let (method, req) = get_next_word(req).ok_or(Err(ParseError::InvalidRequest))?;
+        let (path, req) = get_next_word(req).ok_or(Err(ParseError::InvalidRequest))?;
+        let (protocol, _) = get_next_word(req).ok_or(Err(ParseError::InvalidRequest))?;
+
+        if protocol != "HTTP/1.1" {
+            return Err(ParseError::InvalidProtocol);
+        }
+
+        !todo!()
     }
 }
+
+fn get_next_word(request: &str) -> Option<(&str, &str)> {
+    for (i, c) in request.chars().enumerate() {
+        if c == ' ' || c == '\r' {
+            return Some((&request[..i], &request[i + 1..]));
+        }
+    }
+
+    None
+}
+
+pub enum ParseError {
+    InvalidRequest,
+    InvalidEncoding,
+    InvalidProtocol,
+    InvalidMethod,
+}
+
+impl From<Utf8Error> for ParseError {
+    fn from(_: Utf8Error) -> Self {
+        Self::InvalidEncoding
+    }
+}
+
+impl ParseError {
+    pub fn message(&self) -> &str {
+        match self {
+            ParseError::InvalidRequest => "InvalidRequest",
+            ParseError::InvalidEncoding => "InvalidEncoding",
+            ParseError::InvalidProtocol => "InvalidProtocol",
+            ParseError::InvalidMethod => "InvalidMethod",
+        }
+    }
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", self.message())
+    }
+}
+
+impl Debug for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", self.message())
+    }
+}
+
+impl Error for ParseError {}
