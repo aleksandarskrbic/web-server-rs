@@ -1,7 +1,4 @@
-use super::method::Method;
-use crate::http::ParseError::InvalidEncoding;
-use std::any::TypeId;
-use std::backtrace::Backtrace;
+use super::method::{Method, MethodError};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -11,25 +8,39 @@ use std::str::Utf8Error;
 pub struct Request {
     path: String,
     query_string: Option<String>,
-    method: super::method::Method,
+    method: Method,
 }
 
 impl TryFrom<&[u8]> for Request {
     type Error = ParseError;
 
     fn try_from(buf: &[u8]) -> Result<Self, Self::Error> {
-        //let req = str::from_utf8(buf).or(Err(ParseError::InvalidEncoding))?;
         let req = str::from_utf8(buf)?;
 
-        let (method, req) = get_next_word(req).ok_or(Err(ParseError::InvalidRequest))?;
-        let (path, req) = get_next_word(req).ok_or(Err(ParseError::InvalidRequest))?;
-        let (protocol, _) = get_next_word(req).ok_or(Err(ParseError::InvalidRequest))?;
+        let (method, req) = get_next_word(req).ok_or(ParseError::InvalidRequest)?;
+        let (mut path, req) = get_next_word(req).ok_or(ParseError::InvalidRequest)?;
+        let (protocol, _) = get_next_word(req).ok_or(ParseError::InvalidRequest)?;
 
         if protocol != "HTTP/1.1" {
             return Err(ParseError::InvalidProtocol);
         }
 
-        !todo!()
+        let method: Method = method.parse()?;
+
+        let mut query_string = None;
+
+        if let Some(i) = path.find('?') {
+            query_string = Some(path[i + 1..].to_string());
+            path = &path[..i];
+        }
+
+        let request = Self {
+            path: path.to_string(),
+            query_string,
+            method,
+        };
+
+        Ok(request)
     }
 }
 
@@ -50,12 +61,6 @@ pub enum ParseError {
     InvalidMethod,
 }
 
-impl From<Utf8Error> for ParseError {
-    fn from(_: Utf8Error) -> Self {
-        Self::InvalidEncoding
-    }
-}
-
 impl ParseError {
     pub fn message(&self) -> &str {
         match self {
@@ -64,6 +69,18 @@ impl ParseError {
             ParseError::InvalidProtocol => "InvalidProtocol",
             ParseError::InvalidMethod => "InvalidMethod",
         }
+    }
+}
+
+impl From<Utf8Error> for ParseError {
+    fn from(_: Utf8Error) -> Self {
+        Self::InvalidEncoding
+    }
+}
+
+impl From<MethodError> for ParseError {
+    fn from(_: MethodError) -> Self {
+        Self::InvalidMethod
     }
 }
 
