@@ -7,6 +7,7 @@ use std::str;
 use std::str::Utf8Error;
 
 // 'buf is a lifetime which means that our Request is pointing to some memory in this case it buffer form which request is created
+#[derive(Debug)]
 pub struct Request<'buf> {
     path: &'buf str,
     query_string: Option<QueryString<'buf>>,

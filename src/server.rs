@@ -23,10 +23,10 @@ impl Server {
                     let mut buf = [0; 1024];
                     match stream.read(&mut buf) {
                         Ok(_) => {
-                            println!("Received a request: {:?}", String::from_utf8_lossy(&buf));
-
                             match Request::try_from(&buf[..]) {
-                                Ok(req) => {}
+                                Ok(req) => {
+                                    dbg!(req);
+                                }
                                 Err(err) => println!("Failed to parse request: {}", err),
                             }
                         }
